@@ -13,6 +13,7 @@ import {
   NATIVE_NOTIFICATION_KINDS,
   respondToApprovalAction,
   sendTestNativeNotification,
+  setNativeNotifyAttentionWhileFocused,
   setNativeNotifyEnabled,
   setNativeNotifyKind
 } from './native-notifications'
@@ -46,6 +47,8 @@ beforeEach(() => {
   notify.mockClear()
   desktopWindow.hermesDesktop = { notify } as unknown as Window['hermesDesktop']
   setNativeNotifyEnabled(true)
+  // Pin the pref the suites below assume; attention mode has its own describe.
+  setNativeNotifyAttentionWhileFocused(false)
 
   for (const kind of NATIVE_NOTIFICATION_KINDS) {
     setNativeNotifyKind(kind, true)
@@ -138,6 +141,85 @@ describe('dispatchNativeNotification focus gating', () => {
     setActiveSessionId(null)
     dispatchNativeNotification({ global: true, kind: 'backgroundDone', title: 'Your pet hatched' })
     expect(notify).not.toHaveBeenCalled()
+  })
+})
+
+describe('dispatchNativeNotification attention mode (attentionWhileFocused)', () => {
+  const focusOn = (sessionId: string) => {
+    setWindowState({ focused: true, hidden: false })
+    setActiveSessionId(sessionId)
+  }
+
+  it('reads prefs saved before the field existed as the default, keeping their other choices', async () => {
+    const key = 'hermes:native-notifications'
+    const saved = localStorage.getItem(key)
+    localStorage.setItem(key, JSON.stringify({ enabled: true, kinds: { approval: false } }))
+
+    try {
+      vi.resetModules()
+      const fresh = await import('./native-notifications')
+
+      expect(fresh.$nativeNotifyPrefs.get().attentionWhileFocused).toBe(false)
+      expect(fresh.$nativeNotifyPrefs.get().kinds.approval).toBe(false)
+      expect(fresh.$nativeNotifyPrefs.get().kinds.input).toBe(true)
+    } finally {
+      saved === null ? localStorage.removeItem(key) : localStorage.setItem(key, saved)
+    }
+  })
+
+  it.each(['approval', 'input'] as const)(
+    'fires a persistent %s notification for the viewed, focused session when the pref is on',
+    kind => {
+      const sessionId = freshSession()
+      focusOn(sessionId)
+      setNativeNotifyAttentionWhileFocused(true)
+
+      expect(dispatchNativeNotification({ kind, sessionId, title: 'Blocked' })).toBe(true)
+      expect(notify).toHaveBeenCalledWith(expect.objectContaining({ kind, persistent: true, sessionId }))
+    }
+  )
+
+  it('still suppresses it for the viewed, focused session when the pref is off, and is not persistent when away', () => {
+    const sessionId = freshSession()
+    focusOn(sessionId)
+    expect(dispatchNativeNotification({ kind: 'approval', sessionId, title: 'Blocked' })).toBe(false)
+
+    setWindowState({ focused: false, hidden: true })
+    expect(dispatchNativeNotification({ kind: 'approval', sessionId, title: 'Blocked' })).toBe(true)
+    expect(notify).toHaveBeenLastCalledWith(expect.objectContaining({ persistent: false }))
+  })
+
+  it('never makes completion kinds persistent or focused-eligible', () => {
+    const sessionId = freshSession()
+    focusOn(sessionId)
+    setNativeNotifyAttentionWhileFocused(true)
+
+    expect(dispatchNativeNotification({ kind: 'turnDone', sessionId, title: 'Done' })).toBe(false)
+
+    setWindowState({ focused: false, hidden: true })
+    expect(dispatchNativeNotification({ kind: 'turnDone', sessionId, title: 'Done' })).toBe(true)
+    expect(notify).toHaveBeenLastCalledWith(expect.objectContaining({ persistent: false }))
+  })
+
+  it('still respects the master switch, the kind toggle, the baseline and the throttle', () => {
+    const sessionId = freshSession()
+    focusOn(sessionId)
+    setNativeNotifyAttentionWhileFocused(true)
+
+    setNativeNotifyKind('approval', false)
+    expect(dispatchNativeNotification({ kind: 'approval', sessionId, title: 'x' })).toBe(false)
+    setNativeNotifyKind('approval', true)
+
+    setNativeNotifyEnabled(false)
+    expect(dispatchNativeNotification({ kind: 'approval', sessionId, title: 'x' })).toBe(false)
+    setNativeNotifyEnabled(true)
+
+    markNativeNotifyBaseline()
+    expect(dispatchNativeNotification({ kind: 'approval', sessionId, title: 'x' })).toBe(false)
+    __resetNativeNotifyBaselineForTests()
+
+    expect(dispatchNativeNotification({ kind: 'approval', sessionId, title: 'x' })).toBe(true)
+    expect(dispatchNativeNotification({ kind: 'approval', sessionId, title: 'x' })).toBe(false)
   })
 })
 

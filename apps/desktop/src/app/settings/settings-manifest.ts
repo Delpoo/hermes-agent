@@ -198,6 +198,14 @@ export const SETTINGS_MANIFEST = {
       keywords: ['notifications', 'alerts', 'native', 'banner', 'mute', 'do not disturb'],
       copy: t => ({ label: t.settings.notifications.enableAll, description: t.settings.notifications.enableAllDesc })
     },
+    attentionWhileFocused: {
+      subpage: 'alerts',
+      keywords: ['notifications', 'alerts', 'approval', 'question', 'focus', 'focused', 'persistent', 'sticky'],
+      copy: t => ({
+        label: t.settings.notifications.attentionWhileFocused,
+        description: t.settings.notifications.attentionWhileFocusedDesc
+      })
+    },
     ...Object.fromEntries(
       NATIVE_NOTIFICATION_KINDS.map(kind => [
         `kind-${kind}`,

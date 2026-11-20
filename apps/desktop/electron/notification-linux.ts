@@ -14,6 +14,8 @@ interface NotificationOptions {
   body: string
   silent: boolean
   icon?: string
+  /** 'never' keeps it on screen (expire_timeout 0); default lets the server decide (-1). */
+  timeoutType?: 'default' | 'never'
   actions: { text: string }[]
 }
 
@@ -261,7 +263,7 @@ export function createLinuxNotifications() {
                   'desktop-entry': new Variant('s', 'hermes'),
                   'suppress-sound': new Variant('b', options.silent)
                 },
-                -1
+                options.timeoutType === 'never' ? 0 : -1
               ]
             },
             callOptions,

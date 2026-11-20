@@ -24,6 +24,7 @@ import {
   respondToApprovalAction
 } from '@/store/native-notifications'
 import { startNativeNotifyDismissal } from '@/store/native-notify-dismissal'
+import { startNativeNotifyResolutionDismissal } from '@/store/native-notify-resolution'
 import { requestPluginCatalogInstallFromDeepLink } from '@/store/plugin-catalog-install'
 import { openPluginInstallRequest } from '@/store/plugin-install-request'
 import { openFolderAsProject } from '@/store/projects'
@@ -102,6 +103,8 @@ export function useDesktopIntegrations({
     startMcpHealthChecker()
     // Seeing a session in-app withdraws its now-answered OS notifications.
     const stopNotifyDismissal = startNativeNotifyDismissal()
+    // A resolved approval / question withdraws its OS notification, whoever resolved it.
+    const stopNotifyResolution = startNativeNotifyResolutionDismissal()
     // The native "Check for Updates…" menu item lives in the app menu next to
     // "About Hermes" — it is the OS-standard affordance for updating THIS app,
     // so it always opens the client overlay. Inheriting the connection-mode
@@ -114,6 +117,7 @@ export function useDesktopIntegrations({
       stopUpdatePoller()
       stopMcpHealthChecker()
       stopNotifyDismissal()
+      stopNotifyResolution()
     }
   }, [])
 

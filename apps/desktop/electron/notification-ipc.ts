@@ -65,6 +65,8 @@ export function registerNativeNotifications({
       body: payload?.body || '',
       silent: Boolean(payload?.silent),
       ...(icon ? { icon } : {}),
+      // Blocking prompts: no banner timeout; withdrawn via `hermes:notify-dismiss` once answered.
+      ...(payload?.persistent === true ? { timeoutType: 'never' as const } : {}),
       actions: actions.map(action => ({ type: 'button' as const, text: String(action?.text || '') }))
     }
 
@@ -125,7 +127,11 @@ export function registerNativeNotifications({
         tag: payload?.tag
       })
     })
-    notifications.retain(notification, { kind: payload?.kind, sessionId: payload?.sessionId })
+    notifications.retain(
+      notification,
+      { kind: payload?.kind, sessionId: payload?.sessionId },
+      payload?.persistent === true ? { persistent: true } : undefined
+    )
 
     // The toast is transient; flash the taskbar/dock entry until the window is focused.
     requestAttention(targetWindow())

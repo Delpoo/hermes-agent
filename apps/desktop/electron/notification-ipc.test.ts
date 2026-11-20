@@ -8,7 +8,7 @@ import type { HermesNotification } from './notification-types'
 const host = vi.hoisted(() => ({
   handle: vi.fn(),
   fromWebContents: vi.fn(),
-  shown: [] as EventEmitter[]
+  shown: [] as (EventEmitter & { options: Record<string, unknown> })[]
 }))
 
 vi.mock('electron', () => ({
@@ -19,8 +19,12 @@ vi.mock('electron', () => ({
       return true
     }
 
+    constructor(public options: Record<string, unknown> = {}) {
+      super()
+    }
+
     show() {
-      host.shown.push(this)
+      host.shown.push(this as never)
     }
   }
 }))
@@ -155,4 +159,33 @@ it('flashes an unfocused source window until it regains focus, and leaves a focu
   source.isFocused.mockReturnValue(true)
   await notify(event, { kind: 'turnDone', sessionId: 'c', title: 'Hermes finished' })
   expect(source.flashFrame).toHaveBeenCalledTimes(2)
+})
+
+it('keeps a persistent notification on screen (timeoutType never) and withdraws it on dismiss', async () => {
+  const source = windowStub()
+  host.fromWebContents.mockReturnValue(source)
+  registerNativeNotifications({ getMainWindow: () => null, focusWindow: vi.fn(), platform: 'win32' })
+
+  const notify = host.handle.mock.calls.find(([channel]) => channel === 'hermes:notify')![1] as (
+    event: IpcMainInvokeEvent,
+    payload: HermesNotification
+  ) => Promise<boolean>
+
+  const dismiss = host.handle.mock.calls.find(([channel]) => channel === 'hermes:notify-dismiss')![1] as (
+    event: unknown,
+    payload: { sessionId: string; kinds?: string[] }
+  ) => number
+
+  const event = { sender: source.webContents } as unknown as IpcMainInvokeEvent
+  await notify(event, { kind: 'approval', sessionId: 'rt-1', title: 'Approval', persistent: true })
+  await notify(event, { kind: 'turnDone', sessionId: 'rt-2', title: 'Done' })
+
+  expect(host.shown[0]).toHaveProperty('options.timeoutType', 'never')
+  expect(host.shown[1].options).not.toHaveProperty('timeoutType')
+
+  const close = vi.fn()
+  Object.assign(host.shown[0], { close })
+  // The registry holds the session's id exactly as the renderer sent it.
+  expect(dismiss({}, { sessionId: 'rt-1', kinds: ['approval'] })).toBe(1)
+  expect(close).toHaveBeenCalledOnce()
 })

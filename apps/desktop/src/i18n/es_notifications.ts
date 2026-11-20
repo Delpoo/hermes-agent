@@ -5,6 +5,8 @@ export const esNotifications = {
   enableAll: 'Activar notificaciones',
   enableAllDesc: 'Desactivado silencia todas las notificaciones siguientes.',
   focusedHint: 'Los avisos de finalización solo se activan cuando Hermes está en segundo plano.',
+  attentionWhileFocused: 'Avisar aprobaciones y preguntas aunque esté mirando el chat',
+  attentionWhileFocusedDesc: 'El aviso de Windows queda en pantalla hasta que respondas, en el aviso o en el chat.',
   kinds: {
     approval: {
       label: 'Se necesita aprobación',

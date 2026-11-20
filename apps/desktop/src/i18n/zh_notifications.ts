@@ -5,6 +5,8 @@ export const zhNotifications = {
   enableAll: '启用通知',
   enableAllDesc: '关闭后静音下方所有通知。',
   focusedHint: '完成提醒仅在 Hermes 处于后台时触发。',
+  attentionWhileFocused: '即使我正在查看聊天，也提醒审批和提问',
+  attentionWhileFocusedDesc: '系统通知会一直显示，直到你在通知或聊天中作出回应。',
   kinds: {
     approval: {
       label: '需要批准',

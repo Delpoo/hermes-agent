@@ -5,6 +5,8 @@ export const frNotifications = {
   enableAll: 'Activer les notifications',
   enableAllDesc: 'Désactivé coupe toutes les notifications ci-dessous.',
   focusedHint: 'Les alertes de fin ne se déclenchent que quand Hermes est en arrière-plan.',
+  attentionWhileFocused: 'Alerter pour les approbations et les questions même quand je regarde la conversation',
+  attentionWhileFocusedDesc: 'La notification système reste affichée jusqu\'à ce que vous répondiez, dans la notification ou dans la conversation.',
   kinds: {
     approval: {
       label: 'Approbation requise',

@@ -1,3 +1,5 @@
+import { attentionWhileFocusedEnabled, isAttentionKind, NATIVE_NOTIFICATION_KINDS } from './native-notifications'
+import { hasPendingApproval, hasPendingInputPrompt } from './native-notify-resolution'
 import { $activeSessionId } from './session'
 
 // An OS notification is a request for attention. Once the user is looking at
@@ -14,12 +16,35 @@ function userIsLooking(): boolean {
   return typeof document.hasFocus !== 'function' || document.hasFocus()
 }
 
+/** In attention mode, approvals / questions the chat still waits on keep their notification: seeing the
+ *  chat is not answering it (the notification is withdrawn when the prompt resolves instead). Returns
+ *  the kinds that may be withdrawn, or undefined for "all of them". */
+function dismissibleKinds(sessionId: string): string[] | undefined {
+  if (!attentionWhileFocusedEnabled()) {
+    return undefined
+  }
+
+  const pending = new Set<string>()
+
+  if (hasPendingApproval(sessionId)) {
+    pending.add('approval')
+  }
+
+  if (hasPendingInputPrompt(sessionId)) {
+    pending.add('input')
+  }
+
+  return pending.size ? NATIVE_NOTIFICATION_KINDS.filter(kind => !isAttentionKind(kind) || !pending.has(kind)) : undefined
+}
+
 /** Withdraw the active session's OS notifications when the user is looking at it. */
 export function dismissSeenSessionNotifications(): void {
   const sessionId = $activeSessionId.get()
 
   if (sessionId && userIsLooking()) {
-    void window.hermesDesktop?.dismissNotifications?.({ sessionId })?.catch(() => undefined)
+    const kinds = dismissibleKinds(sessionId)
+
+    void window.hermesDesktop?.dismissNotifications?.({ sessionId, ...(kinds ? { kinds } : {}) })?.catch(() => undefined)
   }
 }
 

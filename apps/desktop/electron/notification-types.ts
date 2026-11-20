@@ -14,5 +14,7 @@ export interface HermesNotification {
   activate?: string
   /** Renderer handle for onActivate / onAction callbacks. */
   notifyId?: string
+  /** Keep the OS notification on screen until it is answered or withdrawn (no auto-hide). */
+  persistent?: boolean
   actions?: { id: string; text: string; activate?: string }[]
 }

@@ -49,6 +49,7 @@ export interface BrowserNotifyPayload {
   body?: string
   focusSessionId?: string
   kind?: string
+  persistent?: boolean
   sessionId?: string
   tag?: string
   title?: string
@@ -68,6 +69,8 @@ export function showBrowserNotification(payload: BrowserNotifyPayload): boolean 
 
   const notification = new Notification(title, {
     body: payload.body,
+    // Blocking prompts stay up until answered (`dismissBrowserNotifications` withdraws them).
+    ...(payload.persistent ? { requireInteraction: true } : {}),
     // One OS entry per session+kind: a replayed event replaces, never stacks.
     tag: `hermes:${payload.kind ?? ''}:${focusSessionId ?? payload.tag ?? ''}`
   })

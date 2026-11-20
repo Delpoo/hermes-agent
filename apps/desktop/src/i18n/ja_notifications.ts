@@ -5,6 +5,8 @@ export const jaNotifications = {
   enableAll: '通知を有効にする',
   enableAllDesc: 'オフで以下の通知をすべて無効にします。',
   focusedHint: '完了通知は Hermes がバックグラウンドにあるときのみ表示されます。',
+  attentionWhileFocused: 'チャットを見ている間も、承認と質問を通知する',
+  attentionWhileFocusedDesc: '通知は、通知上またはチャットで応答するまで画面に残ります。',
   kinds: {
     approval: {
       label: '承認が必要',

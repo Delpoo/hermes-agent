@@ -5,6 +5,8 @@ export interface NotificationSettingsTranslations {
   enableAll: string
   enableAllDesc: string
   focusedHint: string
+  attentionWhileFocused: string
+  attentionWhileFocusedDesc: string
   kinds: Record<
     'approval' | 'backgroundDone' | 'credits' | 'input' | 'plugin' | 'turnDone' | 'turnError',
     { label: string; description: string }

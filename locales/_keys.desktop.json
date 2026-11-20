@@ -4106,6 +4106,8 @@
     "settings.nav.providers",
     "settings.nav.sessions",
     "settings.nav.vault",
+    "settings.notifications.attentionWhileFocused",
+    "settings.notifications.attentionWhileFocusedDesc",
     "settings.notifications.browserPermission.allow",
     "settings.notifications.browserPermission.states.default",
     "settings.notifications.browserPermission.states.denied",

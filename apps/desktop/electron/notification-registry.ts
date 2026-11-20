@@ -14,12 +14,23 @@ export interface NotificationSubject {
 // notification clickable. Linux's terminal NotificationClosed can opt into release.
 const RELEASE_EVENTS = ['click', 'action', 'failed']
 const NOTIFICATION_RETENTION_TTL_MS = 10 * 60 * 1000
+// A persistent (blocking-prompt) notification outlives the usual window: it is withdrawn when the
+// prompt resolves; this only bounds a leak if that signal never arrives.
+const PERSISTENT_RETENTION_TTL_MS = 6 * 60 * 60 * 1000
 
-export function createNotificationRegistry({ ttlMs = NOTIFICATION_RETENTION_TTL_MS, releaseOnClose = false } = {}) {
+export function createNotificationRegistry({
+  ttlMs = NOTIFICATION_RETENTION_TTL_MS,
+  persistentTtlMs = PERSISTENT_RETENTION_TTL_MS,
+  releaseOnClose = false
+} = {}) {
   const live = new Map<RetainedNotification, { release: () => void; subject?: NotificationSubject }>()
   const releaseEvents = releaseOnClose ? [...RELEASE_EVENTS, 'close'] : RELEASE_EVENTS
 
-  function retain(notification: RetainedNotification, subject?: NotificationSubject): void {
+  function retain(
+    notification: RetainedNotification,
+    subject?: NotificationSubject,
+    { persistent = false }: { persistent?: boolean } = {}
+  ): void {
     const release = () => {
       clearTimeout(timer)
       live.delete(notification)
@@ -39,7 +50,7 @@ export function createNotificationRegistry({ ttlMs = NOTIFICATION_RETENTION_TTL_
     const timer = setTimeout(() => {
       notification.close()
       release()
-    }, ttlMs)
+    }, persistent ? Math.max(ttlMs, persistentTtlMs) : ttlMs)
 
     timer.unref()
   }

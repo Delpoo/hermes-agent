@@ -5,6 +5,8 @@ export const enNotifications = {
   enableAll: 'Enable notifications',
   enableAllDesc: 'Off silences every notification below.',
   focusedHint: 'Completion alerts only fire while Hermes is in the background.',
+  attentionWhileFocused: 'Alert for approvals and questions even while I\'m looking at the chat',
+  attentionWhileFocusedDesc: 'Approvals and questions always raise an OS notification, which stays on screen until you answer it in the notification or in the chat.',
   kinds: {
     approval: {
       label: 'Approval needed',

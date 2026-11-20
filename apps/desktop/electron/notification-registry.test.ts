@@ -97,3 +97,22 @@ it('dismisses an expired notification before releasing it and releases failed de
   expect(failed.close).not.toHaveBeenCalled()
   expect(vi.getTimerCount()).toBe(0)
 })
+
+it('keeps a persistent notification past the normal retention window, bounded by its own', () => {
+  vi.useFakeTimers()
+  const registry = createNotificationRegistry({ ttlMs: 1000, persistentTtlMs: 5000 })
+  const make = () => Object.assign(new EventEmitter(), { close: vi.fn() })
+  const normal = make()
+  const persistent = make()
+  registry.retain(normal, { kind: 'turnDone', sessionId: 's1' })
+  registry.retain(persistent, { kind: 'approval', sessionId: 's1' }, { persistent: true })
+
+  vi.advanceTimersByTime(1000)
+  expect(normal.close).toHaveBeenCalledOnce()
+  expect(persistent.close).not.toHaveBeenCalled()
+  expect(registry.has(persistent)).toBe(true)
+
+  vi.advanceTimersByTime(4000)
+  expect(persistent.close).toHaveBeenCalledOnce()
+  expect(registry.has(persistent)).toBe(false)
+})

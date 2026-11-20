@@ -5,6 +5,8 @@ export const deNotifications = {
   enableAll: 'Benachrichtigungen aktivieren',
   enableAllDesc: 'Aus schaltet jede Benachrichtigung unten stumm.',
   focusedHint: 'Abschluss-Alerts feuern nur, während Hermes im Hintergrund ist.',
+  attentionWhileFocused: 'Bei Freigaben und Fragen auch benachrichtigen, wenn ich den Chat ansehe',
+  attentionWhileFocusedDesc: 'Die Systembenachrichtigung bleibt sichtbar, bis du in der Benachrichtigung oder im Chat antwortest.',
   kinds: {
     approval: {
       label: 'Genehmigung nötig',

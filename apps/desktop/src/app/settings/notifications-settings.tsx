@@ -20,6 +20,7 @@ import {
   $nativeNotifyPrefs,
   NATIVE_NOTIFICATION_KINDS,
   sendTestNativeNotification,
+  setNativeNotifyAttentionWhileFocused,
   setNativeNotifyEnabled,
   setNativeNotifyKind
 } from '@/store/native-notifications'
@@ -109,6 +110,15 @@ export function NotificationsSettings({ subpage }: NotificationsSettingsProps = 
           />
 
           {hostHas('browserNotifications') && <BrowserPermissionRow />}
+
+          <ToggleRow
+            checked={prefs.enabled && prefs.attentionWhileFocused}
+            description={copy.attentionWhileFocusedDesc}
+            disabled={!prefs.enabled}
+            id={settingElementId(SETTING_IDS.notifications.attentionWhileFocused)}
+            label={copy.attentionWhileFocused}
+            onChange={setNativeNotifyAttentionWhileFocused}
+          />
 
           {NATIVE_NOTIFICATION_KINDS.map(kind => (
             <ToggleRow

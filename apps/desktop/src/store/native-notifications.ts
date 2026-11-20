@@ -40,6 +40,10 @@ export const NATIVE_NOTIFICATION_KINDS: readonly NativeNotificationKind[] = [
 const ATTENTION_KINDS = new Set<NativeNotificationKind>(['approval', 'input'])
 
 export interface NativeNotificationPrefs {
+  /** Approvals and questions always raise an OS notification — even while the
+   *  user is looking at that chat — and it stays up until the prompt is
+   *  answered (see `native-notify-resolution.ts`). */
+  attentionWhileFocused: boolean
   enabled: boolean
   kinds: Record<NativeNotificationKind, boolean>
 }
@@ -47,6 +51,7 @@ export interface NativeNotificationPrefs {
 const STORAGE_KEY = 'hermes:native-notifications'
 
 const DEFAULT_PREFS: NativeNotificationPrefs = {
+  attentionWhileFocused: false,
   enabled: true,
   kinds: {
     approval: true,
@@ -79,6 +84,10 @@ function readPrefs(): NativeNotificationPrefs {
     }
 
     return {
+      attentionWhileFocused:
+        typeof parsed.attentionWhileFocused === 'boolean'
+          ? parsed.attentionWhileFocused
+          : DEFAULT_PREFS.attentionWhileFocused,
       enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULT_PREFS.enabled,
       kinds
     }
@@ -97,6 +106,10 @@ function writePrefs(next: NativeNotificationPrefs) {
 export function setNativeNotifyEnabled(enabled: boolean) {
   recordFeatureToggle('native_notifications', $nativeNotifyPrefs.get().enabled, enabled)
   writePrefs({ ...$nativeNotifyPrefs.get(), enabled })
+}
+
+export function setNativeNotifyAttentionWhileFocused(on: boolean) {
+  writePrefs({ ...$nativeNotifyPrefs.get(), attentionWhileFocused: on })
 }
 
 export function setNativeNotifyKind(kind: NativeNotificationKind, on: boolean) {
@@ -141,6 +154,13 @@ function isBackgrounded(): boolean {
   return typeof document.hasFocus === 'function' && !document.hasFocus()
 }
 
+/** Blocking-prompt kinds (approval / input). */
+export const isAttentionKind = (kind: string): boolean => ATTENTION_KINDS.has(kind as NativeNotificationKind)
+
+/** True when blocking prompts must raise (and keep) an OS notification even
+ *  while the user is looking at the chat. */
+export const attentionWhileFocusedEnabled = (): boolean => $nativeNotifyPrefs.get().attentionWhileFocused
+
 function shouldFire(kind: NativeNotificationKind, sessionId?: null | string, global = false): boolean {
   // Global notifications aren't tied to a chat session (e.g. pet generation,
   // which runs from the command center with no active conversation). They fire
@@ -150,9 +170,10 @@ function shouldFire(kind: NativeNotificationKind, sessionId?: null | string, glo
     return isBackgrounded()
   }
 
-  // Attention kinds break through for an off-screen session even while focused.
+  // Attention kinds break through for an off-screen session even while focused,
+  // and for the viewed one too when the user opted into attention mode.
   if (ATTENTION_KINDS.has(kind)) {
-    return isBackgrounded() || (Boolean(sessionId) && sessionId !== $activeSessionId.get())
+    return attentionWhileFocusedEnabled() || isBackgrounded() || (Boolean(sessionId) && sessionId !== $activeSessionId.get())
   }
 
   // Completion kinds: only the active session, only while away — so a busy
@@ -253,6 +274,8 @@ export function dispatchNativeNotification(input: NativeNotificationInput): bool
     icon: input.icon,
     kind: input.kind,
     notifyId: input.notifyId,
+    // Stays up until the prompt is resolved; only when something can withdraw it (a session).
+    persistent: ATTENTION_KINDS.has(input.kind) && Boolean(input.sessionId) && prefs.attentionWhileFocused,
     sessionId: input.sessionId ?? undefined,
     // The app-sounds mute also silences OS notification sounds.
     silent: $hapticsMuted.get() || input.silent,

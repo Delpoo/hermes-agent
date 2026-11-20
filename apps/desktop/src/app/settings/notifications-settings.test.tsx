@@ -18,9 +18,10 @@ vi.mock('@/store/native-notifications', async () => {
   const { atom } = await import('nanostores')
 
   return {
-    $nativeNotifyPrefs: atom({ enabled: false, kinds: {} }),
+    $nativeNotifyPrefs: atom({ attentionWhileFocused: false, enabled: false, kinds: {} }),
     NATIVE_NOTIFICATION_KINDS: [],
     sendTestNativeNotification: vi.fn(),
+    setNativeNotifyAttentionWhileFocused: vi.fn(),
     setNativeNotifyEnabled: vi.fn(),
     setNativeNotifyKind: vi.fn()
   }
