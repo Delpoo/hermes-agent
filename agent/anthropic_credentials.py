@@ -648,13 +648,17 @@ def _prefer_refreshable_claude_code_token(env_token: str, creds: Optional[dict[s
     return None
 
 
-def _resolve_anthropic_pool_token(*, skip_borrowed: bool = False) -> Optional[str]:
+def _resolve_anthropic_pool_token(*, skip_borrowed: bool = False, model: Optional[str] = None) -> Optional[str]:
     """First available Anthropic OAuth token from credential_pool, read-only: enumerates with ``clear_expired=False,
     refresh=False`` (never ``select()``) so diagnostic call sites (account_usage, ``hermes models``) never mutate
     auth.json or hit the network; refresh-on-expiry belongs to the API call path's pool recovery."""
     try:
         from agent.credential_pool import AUTH_TYPE_OAUTH, load_pool
-        entries, _pending = load_pool("anthropic")._available_entries(clear_expired=False, refresh=False)
+        # *model* scopes the cooldown check: a per-model 429 bench (Claude window used up on
+        # opus/sonnet) must not hide the key from models that are still available. With model=None
+        # the check stays conservative (any active model cooldown blocks), as before.
+        scope = {"model": model} if model else {}
+        entries, _pending = load_pool("anthropic")._available_entries(clear_expired=False, refresh=False, **scope)
     except Exception:
         logger.debug("Failed to read Anthropic credential_pool", exc_info=True)
         return None
@@ -713,9 +717,27 @@ def resolve_anthropic_token(*, model: Optional[str] = None) -> Optional[str]:
         return _available_anthropic_token(api_key, model)
     # The pool's claude_code row mirrors the same externally owned refresh grant.
     return _available_anthropic_token(
-        _resolve_anthropic_pool_token(skip_borrowed=True) or _resolve_claude_code_token_from_credentials(_read_creds()),
+        _resolve_anthropic_pool_token(skip_borrowed=True, model=model)
+        or _resolve_claude_code_token_from_credentials(_read_creds()),
         model,
     )
+
+
+def anthropic_credential_benched_until(model: Optional[str] = None) -> Optional[float]:
+    """Epoch second the saved Anthropic credential re-enters rotation for *model*, when the pool holds
+    a live (not DEAD, not rejected) entry that is only cooling down; else ``None``.
+
+    Tells "rate-limited, will recover" apart from "no credential at all": the former must never be
+    reported as a missing or rejected key."""
+    try:
+        from agent.credential_pool import STATUS_DEAD, load_pool
+        pool = load_pool("anthropic")
+        live = [e for e in pool.entries() if e.last_status != STATUS_DEAD and e.last_error_code != 401
+                and ((e.access_token or "").strip() or (e.runtime_api_key or "").strip())]
+        return pool.next_available_at(model=model) if live else None
+    except Exception:
+        logger.debug("Failed to inspect Anthropic credential_pool cooldowns", exc_info=True)
+        return None
 
 
 def native_anthropic_fallback_token(base_url: Any, *, model: Optional[str] = None) -> str:

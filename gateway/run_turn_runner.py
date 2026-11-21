@@ -197,6 +197,10 @@ def _resolution_failure_reply(exc: Exception, platform: Platform) -> tuple[str, 
         # Quota cap with valid credentials: /login cannot help; name the reset window (#89401).
         from gateway.run import _gateway_provider_error_reply
         return _gateway_provider_error_reply(str(exc)), auth_permanent, False
+    if isinstance(exc, AuthError) and exc.code == "model_rate_limited":
+        # The credential is valid and only benched for this model until the provider's reset (a used-up
+        # Claude window). Stamping auth_permanent here made the desktop say "rejected your API key".
+        return f"⚠️ {exc}", FailoverReason.rate_limit.value, True
     if platform == Platform.LOCAL:
         # The local operator reads the terminal: the resolver's own sentence ("provider 'custom'
         # resolved without credentials ...") is the diagnosis; /login is not.
@@ -1424,8 +1428,11 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
             logger.warning("Model resolution failed for session %s: %s", ctx.session_key or "", exc, exc_info=True)
             from agent.turn_failure_copy import stamp_failure
             text, reason, retryable = _resolution_failure_reply(exc, ctx.source.platform)
-            return stamp_failure({"final_response": text, "messages": [], "api_calls": 0, "tools": [],
-                                  "failed": True, "completed": False, "error": str(exc)}, reason, retryable)
+            failed = {"final_response": text, "messages": [], "api_calls": 0, "tools": [],
+                      "failed": True, "completed": False, "error": str(exc)}
+            if isinstance(retry_after := getattr(exc, "retry_after", None), (int, float)) and retry_after > 0:
+                failed["failure_resets_at"] = time.time() + float(retry_after)  # card: "Limit resets at HH:mm"
+            return stamp_failure(failed, reason, retryable)
         from gateway.session_authorities import active_authority
         from gateway.session_worker_construct import session_routing
         pr = session_routing(active_authority(runner), policy) if policy else runner._provider_routing
