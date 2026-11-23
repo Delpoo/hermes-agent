@@ -64,8 +64,8 @@ def test_write_file_card_carries_summary_and_counts(tmp_path, monkeypatch):
     command, description = asked[0]
     assert command.startswith("<write to SOUL.md> (")
     assert "removes the five-facts rule" in description
-    assert "-4 / +0 lines" in description
-    assert "sections removed: Blockers" in description
+    assert "-4 / +0" in description
+    assert "− Blockers" in description
     # the real diff, not the agent's words, reaches the summarizer — wrapped as untrusted data
     user_msg = seen[0]["messages"][1]["content"]
     assert "<change>" in user_msg and "-Always list five facts." in user_msg
@@ -106,7 +106,7 @@ def test_v4a_multi_file_patch_is_one_prompt_with_one_summary(tmp_path, monkeypat
     assert "denied" in res["error"]
     assert len(asked) == 1 and len(seen) == 1
     assert "Adds a rule to both profiles." in asked[0][1]
-    assert "-0 / +2 lines" in asked[0][1]
+    assert "-0 / +2" in asked[0][1]
 
 
 def test_summarizer_failure_falls_back_to_counts(tmp_path, monkeypatch):
@@ -120,7 +120,7 @@ def test_summarizer_failure_falls_back_to_counts(tmp_path, monkeypatch):
 
     command, description = asked[0]
     assert command.startswith("<write to SOUL.md> (")
-    assert "-0 / +1 lines" in description
+    assert "-0 / +1" in description
 
 
 def test_disabled_keeps_the_old_card(tmp_path, monkeypatch):
