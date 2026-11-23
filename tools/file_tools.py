@@ -773,7 +773,7 @@ def _resolve_or_none(filepath: str, task_id: str, *, entry: bool = False) -> str
 
 
 def _write_precheck_error(paths: list[str], content_paths: list[str], task_id: str,
-                          cross_profile: bool) -> str | None:
+                          cross_profile: bool, preview=None) -> str | None:
     """Run the shared write/patch guards in order; return the first error string.
 
     Order matters: hard denies (sensitive path, mirror) and the corruption
@@ -789,8 +789,30 @@ def _write_precheck_error(paths: list[str], content_paths: list[str], task_id: s
         err = _check_binary_document_write(p, task_id)
         if err:
             return err
-    return (_check_protected_instruction_write(paths, task_id)
+    return (_check_protected_instruction_write(paths, task_id, preview=preview)
             or _check_approval_required_write(paths, task_id))
+
+
+def _write_change_preview(path: str, content: str, task_id: str) -> str:
+    """Unified diff of the file on disk -> ``content``, for the approval card (built lazily, only
+    when a protected-instruction prompt is actually shown). Reads through the task's file ops."""
+    from tools.approval_change_summary import unified_preview
+    old = ""
+    resolved = _resolve_or_none(path, task_id)
+    if resolved:
+        try:
+            result = _get_file_ops(task_id).read_file_raw(resolved)
+            if not getattr(result, "error", None) and isinstance(getattr(result, "content", None), str):
+                old = result.content
+        except Exception:
+            old = ""
+    return unified_preview(old, content, os.path.basename(path))
+
+
+def _replace_change_preview(path: str, old_string: str, new_string: str) -> str:
+    """The replaced region as a unified diff (old_string -> new_string), for the approval card."""
+    from tools.approval_change_summary import unified_preview
+    return unified_preview(old_string or "", new_string or "", os.path.basename(path))
 
 
 def _edit_warnings(paths: list[str], path_to_resolved: dict, task_id: str) -> list[str]:
@@ -876,7 +898,8 @@ def write_file_tool(path: str, content: str, task_id: str = "default",
     # write_file checks the binary-document guard before the mirror guard.
     err = (_check_sensitive_path(path, task_id)
            or _check_binary_document_write(path, task_id)
-           or _check_protected_instruction_write([path], task_id)
+           or _check_protected_instruction_write(
+               [path], task_id, preview=lambda: _write_change_preview(path, content, task_id))
            or _check_approval_required_write([path], task_id)
            or (None if cross_profile else _check_cross_profile_path(path, task_id)))
     if not err and _is_internal_file_tool_content(content):
@@ -979,7 +1002,14 @@ def patch_tool(mode: str = "replace", path: str | None = None, old_string: str |
         _paths_to_check += collected[0]
         _content_write_paths += collected[1]
         _entry_paths = collected[2]
-    precheck_err = _write_precheck_error(_paths_to_check, _content_write_paths, task_id, cross_profile)
+    if mode == "patch" and patch:
+        _preview = patch
+    elif path and old_string is not None and new_string is not None:
+        _preview = lambda: _replace_change_preview(path, old_string, new_string)  # noqa: E731
+    else:
+        _preview = None
+    precheck_err = _write_precheck_error(_paths_to_check, _content_write_paths, task_id, cross_profile,
+                                         preview=_preview)
     if precheck_err:
         return tool_error(precheck_err)
     try:

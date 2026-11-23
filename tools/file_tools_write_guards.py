@@ -254,8 +254,12 @@ _APPROVAL_UNAVAILABLE = "requires approval but the approval subsystem is unavail
 _NO_HUMAN = "requires approval but no interactive user or gateway is present to approve it."
 
 
-def _request_protected_instruction_approval(reasons: list[str], task_id: str = "default") -> str | None:
+def _request_protected_instruction_approval(reasons: list[str], task_id: str = "default",
+                                            preview=None) -> str | None:
     """Ask the human to approve a write to protected instruction file(s); ``None`` when approved.
+
+    ``preview`` (a diff, or a thunk returning one) lets the card describe the change itself; see
+    ``tools.approval_change_summary``. Without it the card names only the file.
 
     Deliberately NOT routed through ``_run_approval_gate`` (honors --yolo and
     allowlists): this gate is one-operation approval EVERY time, no persisted
@@ -267,6 +271,15 @@ def _request_protected_instruction_approval(reasons: list[str], task_id: str = "
         "These files steer future agent behavior; approval is always "
         "required (not bypassed by auto-approve).")
     display = f"<write to {targets}>"
+    try:
+        from tools.approval_change_summary import summarize_change
+        summary = summarize_change(targets, preview) if preview is not None else None
+    except Exception:
+        summary = None
+    if summary:
+        # The synthetic "<...> (" label makes surfaces show the description instead of the label.
+        description = f"{summary}\n\n{description}"
+        display = f"<write to {targets}> (change summary below)"
     blocked = (
         f"BLOCKED: write to protected agent-instruction file(s) ({targets}) "
         "{why} The user has NOT consented to this write. Do NOT retry it or "
@@ -337,9 +350,11 @@ def _request_protected_instruction_approval(reasons: list[str], task_id: str = "
     return timed_out if timed else denied
 
 
-def _check_protected_instruction_write(paths: list[str], task_id: str = "default") -> str | None:
+def _check_protected_instruction_write(paths: list[str], task_id: str = "default",
+                                       preview=None) -> str | None:
     """Gate a write/patch touching protected instruction files. ONE protected file gates
-    the ENTIRE multi-file patch (one prompt, all-or-nothing)."""
+    the ENTIRE multi-file patch (one prompt, all-or-nothing). ``preview``: see
+    ``_request_protected_instruction_approval``."""
     enabled, extra = _protected_instruction_config()
     if not enabled:
         return None
@@ -347,7 +362,7 @@ def _check_protected_instruction_write(paths: list[str], task_id: str = "default
                            for p in paths) if r]
     if not reasons:
         return None
-    return _request_protected_instruction_approval(reasons, task_id)
+    return _request_protected_instruction_approval(reasons, task_id, preview=preview)
 
 
 # Approval key -> (prompt noun, why it is gated). One key per class so an approve-always for one

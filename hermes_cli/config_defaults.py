@@ -1629,6 +1629,10 @@ DEFAULT_CONFIG = {
         # Extra rules appended to the smart-approval guardian's SYSTEM prompt, e.g. "Always ESCALATE
         # commands touching /etc".
         "smart_policy": "",
+        # Protected instruction-file writes (SOUL.md, AGENTS.md, ...): the approval card describes
+        # the change itself — removed/added line counts plus a plain-language summary by the
+        # auxiliary `approval` model, in the file's language. false = card names the file only.
+        "protected_write_summary": True,
         # After this many consecutive guardian DENYs in a session, the deny message escalates to a
         # hard-stop (report to user / ask for /approve). Approval resets; 0 off.
         "denial_breaker_threshold": 3,
