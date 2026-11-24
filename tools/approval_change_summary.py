@@ -95,7 +95,6 @@ def _stats_line(stats: dict) -> str:
 
 def _llm_summary(targets: str, preview: str) -> str:
     from agent.auxiliary_client import _get_task_timeout, call_llm
-    from tools.approval_smart import _verdict_reasoning
 
     if len(preview) > _MAX_PREVIEW_CHARS:
         preview = preview[:_MAX_PREVIEW_CHARS] + "\n[... change truncated ...]"
@@ -105,7 +104,9 @@ def _llm_summary(targets: str, preview: str) -> str:
             {"role": "system", "content": _SYSTEM_PROMPT},
             {"role": "user", "content": f"Files: {targets}\n\n<change>\n{preview}\n</change>"},
         ],
-        reasoning_config=_verdict_reasoning(),
+        # Thinking always off: a plain summary does not need it, and with the approval slot's
+        # reasoning_effort set it took 4-10 s instead of ~2 s, delaying the card the user waits on.
+        reasoning_config={"enabled": False},
     )
     return (response.choices[0].message.content or "").strip()
 
