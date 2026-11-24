@@ -81,9 +81,43 @@ function keyedPromptStore<T extends KeyedPrompt>(): PromptStore<T> {
 // arrives as an `approval` server request whose id is `serverRequestId`; the
 // card answers that request when it is still open and falls back to the
 // `approval.respond` RPC when the prompt was restored from `approval.pending`.
+// Plain-language context the backend writes for the person who answers (tools/approval_card.py):
+// change kind as an emoji title, reversibility, an opening sentence and a folded explanation.
+export interface ApprovalCard {
+  changeStats?: string
+  commandLabel?: string
+  explainLabel?: string
+  explanation?: string
+  opening?: string
+  reversibleLabel?: string
+  title?: string
+}
+
+export function approvalCardFrom(raw: unknown): ApprovalCard | undefined {
+  if (!raw || typeof raw !== 'object') {
+    return undefined
+  }
+
+  const r = raw as Record<string, unknown>
+  const s = (key: string) => (typeof r[key] === 'string' && (r[key] as string).trim() ? (r[key] as string).trim() : undefined)
+
+  const card: ApprovalCard = {
+    changeStats: s('change_stats'),
+    commandLabel: s('command_label'),
+    explainLabel: s('explain_label'),
+    explanation: s('explanation'),
+    opening: s('opening'),
+    reversibleLabel: s('reversible_label'),
+    title: s('title')
+  }
+
+  return card.opening || card.title ? card : undefined
+}
+
 export interface ApprovalRequest extends KeyedPrompt {
   // false when the backend won't honor a permanent allow → hide "Always allow".
   allowPermanent?: boolean
+  card?: ApprovalCard
   choices?: string[]
   command: string
   description: string
@@ -98,6 +132,7 @@ interface ApprovalGateway {
 
 interface PendingApprovalPayload {
   allow_permanent?: boolean
+  card?: unknown
   choices?: unknown
   command?: unknown
   description?: unknown
@@ -327,6 +362,7 @@ export async function replayPendingApproval(gateway: ApprovalGateway | null, ses
         choices: Array.isArray(pending.choices)
           ? pending.choices.filter(choice => typeof choice === 'string')
           : undefined,
+        card: approvalCardFrom(pending.card),
         command: typeof pending.command === 'string' ? pending.command : '',
         description: typeof pending.description === 'string' ? pending.description : 'dangerous command',
         requestId: pending.request_id,

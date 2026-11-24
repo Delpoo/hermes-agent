@@ -293,6 +293,8 @@ const ApprovalCard: FC<ApprovalCardProps> = ({ request, total, position, stack }
   const showsDescription = !hasCommand || SYNTHETIC_COMMAND_RE.test(request.command.trim())
 
   const details = showsDescription ? request.description.trim() : request.command.trim()
+  // Plain-language context from the backend (tools/approval_card.py); without it the card keeps the raw view.
+  const card = request.card
 
   const respond = useCallback(
     async (choice: ApprovalChoice) => {
@@ -334,19 +336,64 @@ const ApprovalCard: FC<ApprovalCardProps> = ({ request, total, position, stack }
       onPointerDownCapture={rememberFocusOrigin}
       ref={cardRef}
     >
-      <div className="flex items-center gap-2 px-2.5 pt-2 text-xs text-(--ui-text-secondary)">
-        <Codicon name="terminal" size="0.875rem" />
-        <span>{showsDescription ? copy.commandDetails : copy.command}</span>
-        {total > 1 && (
-          <span className="ml-auto text-[0.6875rem] tabular-nums text-(--ui-text-tertiary)">
-            {position} / {total}
-          </span>
-        )}
-      </div>
-      {details.length > 0 && (
-        <pre className="m-0 max-h-40 overflow-auto whitespace-pre-wrap break-words px-2.5 py-2 font-mono text-xs leading-relaxed text-(--ui-text-primary)">
-          {details}
-        </pre>
+      {card ? (
+        <div className="px-3 pt-2.5 pb-1" data-slot="tool-approval-context">
+          <div className="flex flex-wrap items-center gap-2">
+            {card.title && <span className="text-sm font-semibold text-(--ui-text-primary)">{card.title}</span>}
+            {card.reversibleLabel && (
+              <span className="rounded-full border border-(--ui-stroke-secondary) px-2 py-px text-[0.6875rem] text-(--ui-text-secondary)">
+                {card.reversibleLabel}
+              </span>
+            )}
+            {total > 1 && (
+              <span className="ml-auto text-[0.6875rem] tabular-nums text-(--ui-text-tertiary)">
+                {position} / {total}
+              </span>
+            )}
+          </div>
+          {card.opening && <p className="m-0 mt-1.5 text-sm leading-relaxed text-(--ui-text-primary)">{card.opening}</p>}
+          {card.explanation && (
+            <details className="mt-1.5 text-[0.8125rem]">
+              <summary className="cursor-pointer select-none text-(--ui-text-secondary)">
+                {card.explainLabel || copy.commandDetails}
+              </summary>
+              <div className="mt-1.5 max-h-72 overflow-auto leading-relaxed text-(--ui-text-primary)">
+                {card.explanation.split(/\n\s*\n/).map((para, i) => (
+                  <p className="m-0 mb-2 whitespace-pre-wrap" key={i}>
+                    {para}
+                  </p>
+                ))}
+              </div>
+            </details>
+          )}
+          {(details.length > 0 || card.changeStats) && (
+            <details className="mt-1 text-[0.8125rem]">
+              <summary className="cursor-pointer select-none text-(--ui-text-secondary)">
+                {card.commandLabel || copy.command}
+              </summary>
+              <pre className="m-0 mt-1.5 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md border border-(--ui-stroke-tertiary) px-2 py-1.5 font-mono text-xs leading-relaxed text-(--ui-text-primary)">
+                {[request.command.trim(), card.changeStats].filter(Boolean).join('\n\n')}
+              </pre>
+            </details>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-2 px-2.5 pt-2 text-xs text-(--ui-text-secondary)">
+            <Codicon name="terminal" size="0.875rem" />
+            <span>{showsDescription ? copy.commandDetails : copy.command}</span>
+            {total > 1 && (
+              <span className="ml-auto text-[0.6875rem] tabular-nums text-(--ui-text-tertiary)">
+                {position} / {total}
+              </span>
+            )}
+          </div>
+          {details.length > 0 && (
+            <pre className="m-0 max-h-40 overflow-auto whitespace-pre-wrap break-words px-2.5 py-2 font-mono text-xs leading-relaxed text-(--ui-text-primary)">
+              {details}
+            </pre>
+          )}
+        </>
       )}
       <div className="flex items-center justify-end gap-1.5 px-2 pb-2 pt-1" data-slot="tool-approval-actions">
         <Button data-approval-deny="" disabled={busy} onClick={() => void respond('deny')} size="sm" variant="text">

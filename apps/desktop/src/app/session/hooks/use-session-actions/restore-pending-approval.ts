@@ -1,5 +1,5 @@
 import { $gateway } from '@/store/gateway'
-import { receiveApprovalRequest, replayPendingApproval } from '@/store/prompts'
+import { approvalCardFrom, receiveApprovalRequest, replayPendingApproval } from '@/store/prompts'
 import type { SessionResumeResult } from '@/types/hermes'
 
 /** Re-park a resume snapshot's pending approval; true when one was restored. */
@@ -15,6 +15,7 @@ export function restorePendingApproval(response: SessionResumeResult, sessionId:
   // clobber it with a copy that can only answer through the RPC fallback.
   void receiveApprovalRequest(null, {
     allowPermanent: pending.allow_permanent !== false,
+    card: approvalCardFrom((pending as { card?: unknown }).card),
     choices: pending.choices,
     command: pending.command ?? '',
     description: pending.description ?? 'dangerous command',

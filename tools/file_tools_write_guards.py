@@ -271,15 +271,25 @@ def _request_protected_instruction_approval(reasons: list[str], task_id: str = "
         "These files steer future agent behavior; approval is always "
         "required (not bypassed by auto-approve).")
     display = f"<write to {targets}>"
-    try:
-        from tools.approval_change_summary import summarize_change
-        summary = summarize_change(targets, preview) if preview is not None else None
-    except Exception:
-        summary = None
-    if summary:
+    preview_text = None
+    if preview is not None:
+        try:
+            preview_text = preview() if callable(preview) else preview
+        except Exception:
+            preview_text = None
+
+    def _summarized(desc: str, disp: str) -> tuple[str, str]:
+        """Old-style summary folded into the description (surfaces without context cards)."""
+        try:
+            from tools.approval_change_summary import summarize_change
+            summary = summarize_change(targets, preview_text) if preview_text else None
+        except Exception:
+            summary = None
+        if not summary:
+            return desc, disp
         # The synthetic "<...> (" label makes surfaces show the description instead of the label.
-        description = f"{summary}\n\n{description}"
-        display = f"<write to {targets}> (change summary below)"
+        return f"{summary}\n\n{desc}", f"<write to {targets}> (change summary below)"
+
     blocked = (
         f"BLOCKED: write to protected agent-instruction file(s) ({targets}) "
         "{why} The user has NOT consented to this write. Do NOT retry it or "
@@ -303,13 +313,21 @@ def _request_protected_instruction_approval(reasons: list[str], task_id: str = "
     notify_cb = _approval._gateway_notify_cb(session_key)
 
     if notify_cb is not None:
+        try:
+            from tools.approval_context import _get_approval_config
+            cards_on = _get_approval_config().get("context_card", True) is not False
+        except Exception:
+            cards_on = True
+        g_description, g_display = (description, display) if cards_on else _summarized(description, display)
         approval_data = {
-            "command": display,
+            "command": g_display,
             "pattern_key": "protected_instruction_file",
             "pattern_keys": ["protected_instruction_file"],
-            "description": description,
+            "description": g_description,
             "allow_permanent": False,
             "allow_session": False}
+        if cards_on and preview_text:
+            approval_data["change_preview"] = preview_text  # consumed by tools.approval_card
         decision = _await_gateway_decision(session_key, notify_cb, approval_data, surface="gateway")
         if decision.get("notify_failed"):
             return blocked.format(why="requires approval but the approval request could not be delivered.")
@@ -334,6 +352,7 @@ def _request_protected_instruction_approval(reasons: list[str], task_id: str = "
             return blocked.format(why=_NO_HUMAN)
         # Same observer payload as the gateway branch (#131876), fired like the
         # dangerous-command CLI prompt in tools/approval.py.
+        description, display = _summarized(description, display)  # the CLI panel has no context card
         hook_kwargs = dict(command=display, description=description, pattern_key="protected_instruction_file",
                            pattern_keys=["protected_instruction_file"], session_key=session_key, surface="cli")
         _fire_approval_hook("pre_approval_request", **hook_kwargs)

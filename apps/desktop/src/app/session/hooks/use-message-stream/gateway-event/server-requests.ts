@@ -25,6 +25,7 @@ import type { ScopedServerRequest } from '@/store/gateway'
 import { dispatchNativeNotification } from '@/store/native-notifications'
 import type { PreviewOwner } from '@/store/preview-ownership'
 import {
+  approvalCardFrom,
   receiveApprovalRequest,
   setSecretRequest,
   setSudoRequest,
@@ -396,9 +397,11 @@ const approval: Handler = ctx => {
   }
 
   rememberServerRequest(request)
+  const card = approvalCardFrom(p.card)
   void receiveApprovalRequest(null, {
     // false only when the backend forbids a permanent allow; it omits the field otherwise.
     allowPermanent: p.allow_permanent !== false,
+    card,
     choices: Array.isArray(p.choices)
       ? p.choices.filter((choice): choice is string => typeof choice === 'string')
       : undefined,
@@ -424,7 +427,8 @@ const approval: Handler = ctx => {
           text: translateNow('notifications.native.rejectAction')
         }
       ],
-      body: command || description,
+      // The plain-language opening tells the user what is asked; the raw command rarely does.
+      body: card?.opening || command || description,
       kind: 'approval',
       sessionId: sessionId || null,
       title: translateNow('notifications.native.approvalTitle')

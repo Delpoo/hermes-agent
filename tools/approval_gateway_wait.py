@@ -179,6 +179,10 @@ def _await_gateway_decision(session_key: str, notify_cb, approval_data: dict, *,
     from agent.terminal_approval_batch import approval_published, preparing_terminal_approval, register_prepared_approval
 
     primary_key = approval_data.get("pattern_key", "")
+    # A protected-file diff feeds the context card only; it never rides in the queued entry.
+    change_preview = approval_data.get("change_preview")
+    if change_preview is not None:
+        approval_data = {k: v for k, v in approval_data.items() if k != "change_preview"}
     if surface == "gateway":
         surface = _ctx.gateway_approval_surface()
     payload = {
@@ -266,6 +270,17 @@ def _await_gateway_decision(session_key: str, notify_cb, approval_data: dict, *,
     with human_input_request("approval", prompt=payload["command"], session_key=session_key) as human:
         # Plugins hear about the request before the gateway does (real-time observers).
         _ctx._fire_approval_hook("pre_approval_request", **payload)
+        # Plain-language context for the person who answers (kind, reversibility, what is asked), built
+        # only by the entry that actually notifies (coalesced followers never pay for it) and before the
+        # timeout clock starts. See tools/approval_card.py.
+        if "card" not in entry.data:
+            try:
+                from tools.approval_card import build_card
+                card = build_card({**entry.data, "change_preview": change_preview or ""}, session_key)
+                if card:
+                    entry.data["card"] = card
+            except Exception:
+                logger.debug("approval context card unavailable", exc_info=True)
         # Bridges sync agent thread → async gateway.
         try:
             notify_cb(dict(entry.data))

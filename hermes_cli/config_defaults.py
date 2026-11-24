@@ -1633,6 +1633,12 @@ DEFAULT_CONFIG = {
         # the change itself — removed/added line counts plus a plain-language summary by the
         # auxiliary `approval` model, in the file's language. false = card names the file only.
         "protected_write_summary": True,
+        # Approval cards shown to a human carry plain-language context written by the auxiliary
+        # `approval` model from the real command/diff and the asking chat: change kind (emoji title),
+        # reversibility, an opening sentence and a folded explanation. false = raw command only.
+        "context_card": True,
+        # Language of that text ("es", "en", ...); empty = display.language.
+        "card_language": "",
         # After this many consecutive guardian DENYs in a session, the deny message escalates to a
         # hard-stop (report to user / ask for /approve). Approval resets; 0 off.
         "denial_breaker_threshold": 3,

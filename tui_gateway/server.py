@@ -661,6 +661,9 @@ def _approval_request_payload(data: dict | None) -> dict:
         payload["choices"] = choices + ["deny"]
     from gateway.run import _redact_approval_command  # description too: consent prompts carry MCP/vault text
     payload.update({k: _redact_approval_command(payload[k]) for k in ("command", "description") if k in payload})
+    if isinstance(payload.get("card"), dict):  # model-written context text can echo secrets from the command
+        payload["card"] = {k: _redact_approval_command(v) if isinstance(v, str) else v
+                           for k, v in payload["card"].items()}
     return payload
 
 
