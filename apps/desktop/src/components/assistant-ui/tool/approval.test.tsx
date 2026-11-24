@@ -108,6 +108,34 @@ describe('PendingApprovalStack', () => {
     expect(screen.queryByText(/plugin approval rule/)).toBeNull()
   })
 
+  it('renders the plain-language context card with folded explanation and command', () => {
+    setRequest('python registro.py actualizar X', undefined, { requestId: 'apr-card' })
+    setApprovalRequest({
+      card: {
+        commandLabel: 'Ver comando técnico',
+        explainLabel: 'Explicación',
+        explanation: 'El guardián es un programa.\n\nSi rechazás no pasa nada.',
+        opening: 'El chat «Auditoría» pide permiso para corregir una falsa alarma.',
+        reversibleLabel: 'se puede deshacer',
+        title: '🔧 Ajuste interno de Hermes'
+      },
+      command: 'python registro.py actualizar X',
+      description: 'script execution via -e/-c flag',
+      requestId: 'apr-card',
+      sessionId: 'sess-1'
+    })
+    const { container } = render(<PendingApprovalStack />)
+
+    expect(screen.getByText('🔧 Ajuste interno de Hermes')).toBeTruthy()
+    expect(screen.getByText('se puede deshacer')).toBeTruthy()
+    expect(screen.getByText(/pide permiso para corregir una falsa alarma/)).toBeTruthy()
+    const folds = [...container.querySelectorAll('details')]
+    expect(folds.map(d => d.querySelector('summary')?.textContent)).toEqual(['Explicación', 'Ver comando técnico'])
+    expect(folds.every(d => !d.open)).toBe(true)
+    expect(screen.getByText('Si rechazás no pasa nada.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Run/ })).toBeTruthy()
+  })
+
   it('keeps showing the real command for ordinary dangerous-command approvals', () => {
     setRequest('chmod -R 777 /tmp/x')
     render(<PendingApprovalStack />)
