@@ -89,8 +89,23 @@ def _cfg() -> dict:
         return {}
 
 
-def _lang() -> str:
+_ES_WORDS = re.compile(r"\b(que|de|los|las|para|con|una|por|está|esto|qué|cómo|también|vos|podés|hacé)\b", re.I)
+_EN_WORDS = re.compile(r"\b(the|and|with|this|that|what|how|please|you|is|are|can)\b", re.I)
+
+
+def _chat_lang(excerpt: str) -> str | None:
+    """Language of the user's own messages in the excerpt (es/en), by a cheap word count."""
+    user_text = " ".join(line[6:] for line in excerpt.split("\n\n") if line.startswith("USER: "))
+    es, en = len(_ES_WORDS.findall(user_text)), len(_EN_WORDS.findall(user_text))
+    if es + en < 3:
+        return None
+    return "es" if es > en else "en"
+
+
+def _lang(excerpt: str = "") -> str:
     lang = str(_cfg().get("card_language") or "").strip().lower()
+    if not lang and excerpt:
+        lang = _chat_lang(excerpt) or ""
     if not lang:
         try:
             from agent.i18n import get_language
@@ -189,8 +204,11 @@ def build_card(approval_data: dict, session_key: str) -> dict | None:
     """The ``card`` dict for *approval_data*, or ``None`` (disabled, or nothing usable)."""
     if _cfg().get("context_card", True) is False:
         return None
-    lang = _lang()
-    labels = _labels(lang)
+    try:
+        title, excerpt = chat_excerpt(session_key)
+    except Exception:
+        title, excerpt = "", ""
+    labels = _labels(_lang(excerpt))
     preview = approval_data.get("change_preview") or ""
     action = (f"Command or target: {approval_data.get('command', '')}\n"
               f"Why it was flagged: {approval_data.get('description', '')}")
@@ -198,7 +216,6 @@ def build_card(approval_data: dict, session_key: str) -> dict | None:
         action += f"\n\nProposed change (unified diff; '-' removed, '+' added):\n{preview}"
     data: dict[str, Any] | None = None
     try:
-        title, excerpt = chat_excerpt(session_key)
         data = _ask_model(action, title, excerpt, labels["language"])
     except Exception as exc:
         logger.warning("approval context card failed (%s: %s); using fallback", type(exc).__name__, exc)

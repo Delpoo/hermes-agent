@@ -29,7 +29,7 @@ def _fake_llm(monkeypatch, text=None, exc=None, seen=None):
 
 @pytest.fixture(autouse=True)
 def _spanish_no_chat(monkeypatch):
-    monkeypatch.setattr(ac, "_lang", lambda: "es")
+    monkeypatch.setattr(ac, "_lang", lambda excerpt="": "es")
     monkeypatch.setattr(ac, "chat_excerpt", lambda sk: ("Auditoría", "USER: arreglá el guardián"))
     monkeypatch.setattr(ac, "_cfg", lambda: {})
 
@@ -52,6 +52,12 @@ def test_card_has_emoji_title_reversibility_and_text(monkeypatch):
     assert "UNTRUSTED" in msgs[0]["content"] and "Spanish" in msgs[0]["content"]
     assert "<chat_title>Auditoría</chat_title>" in msgs[1]["content"] and "<action>" in msgs[1]["content"]
     assert seen[0]["reasoning_config"] == {"enabled": False}
+
+
+def test_chat_language_detection():
+    assert ac._chat_lang("USER: arreglá esto que está roto, por favor, con cuidado") == "es"
+    assert ac._chat_lang("USER: please fix this and tell me what you changed") == "en"
+    assert ac._chat_lang("AGENT: hola que tal de los") is None
 
 
 def test_unknown_kind_falls_back_to_pattern(monkeypatch):
